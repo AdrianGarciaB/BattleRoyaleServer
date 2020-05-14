@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -21,24 +22,51 @@ namespace BattleRoyale_Server
             {
                 while (true)
                 {
+                    try { 
                     var received = await server.Receive();
+                    string[] response = received.Message.Split(":");
                     Console.WriteLine("[IN] " + "New message");
-                    foreach (KeyValuePair<int, ClientThread> entry in clientsList)
+                    if (response[0] != "0")
                     {
-                        if (entry.Value.getSender().Equals(received.Sender)) {
-                            Console.WriteLine("[RECV] " + received.Sender);
-                            entry.Value.Receive(received.Message);
-                            return;
+                        
+                        foreach (KeyValuePair<int, ClientThread> entry in clientsList)
+                        {
+                            if (entry.Value.getClientId() == int.Parse(response[0]))
+                            {
+                                Console.WriteLine("[RECV] " + received.Sender);
+                                entry.Value.Receive(response);
+                            }
                         }
+                        
                     }
-                    ClientThread client = new ClientThread(received, idAvailable);
-                    clientsList.Add(idAvailable, client);
-                    idAvailable++;
-                    Console.WriteLine("[NEW] Client: " + received.Sender.ToString());
+                    else {
+                        ClientThread client = new ClientThread(received.Sender, idAvailable);
+                            /*
+                        foreach (KeyValuePair<int, ClientThread> entry in clientsList)
+                        {
+                            entry.Value.Receive(new string[]{idAvailable.ToString(), "newplayer"});
+                        }*/
+                        clientsList.Add(idAvailable, client);
+                        idAvailable++;
+                        Console.WriteLine("[NEW] Client: " + received.Sender.ToString());
+                    }
+                        
+                    }
+                    catch (TimeoutException te)
+                    {
+                        Console.WriteLine("Timeout!");
+                    }
+                    catch (AggregateException ae)
+                    {
+                        Console.WriteLine("Disconected!");
+                    }
 
                 }
+
             }).Wait();
 
+            Console.ReadKey();
+            
             String consoleInput;
 
             do
@@ -54,9 +82,10 @@ namespace BattleRoyale_Server
                         
                         break;
                     case "online":
-                        Console.Write(clientsList.Count);
+                        Console.WriteLine(clientsList.Count);
                         break;
                     case "":
+                    case "exit":
                         break;
                     default:
                         Console.WriteLine("Comando desconocido");
@@ -70,6 +99,12 @@ namespace BattleRoyale_Server
         public static void removeClient(int id)
         {
             clientsList.Remove(id);
+        }
+
+        public static void Reply(string message, IPEndPoint address)
+        {
+              server.Reply(message, address);
+            
         }
     }
 }
