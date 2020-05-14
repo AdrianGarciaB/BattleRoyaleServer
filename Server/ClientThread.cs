@@ -1,5 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.Net;
+using System.Net.Sockets;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,17 +28,23 @@ namespace BattleRoyale_Server
     }
     class ClientThread : BaseThread
     {
-        private Received socket;
+        private UdpClient udpClient;
+        IPEndPoint address;
+        private IPAddress clientIp;
+        private int port;
         private int timeout;
         private int clientId;
         bool connected = true;
-        public ClientThread(Received socket, int clientId) : base()
+        public ClientThread(IPEndPoint address, int clientId) : base()
         {
-            this.socket = socket;
+            Console.WriteLine("Setup client...");
+            this.address = address;
+            this.udpClient = new UdpClient();
             this.timeout = 0;
             this.clientId = clientId;
-            
-            Reply("Connected!");
+            Console.WriteLine("Sending ID...");
+
+            Send(clientId.ToString());
             checkAliveListener();
         }
 
@@ -44,22 +53,26 @@ namespace BattleRoyale_Server
           
         }
 
-        public void Receive(string message)
+        public void Receive(string[] message)
         {
-            switch (message)
+            switch (message[1])
             {
                 case "alive":
                     timeout = 0;
-                    Console.WriteLine("Alive from " + getSender());
+                    Console.WriteLine("Alive from " + address);
+                    break;
+                case "newplayer":
+                    Console.WriteLine("[OUTGOING] New player");
+
+                    Send(message[0]+":" + "newplayer");
+                    break;
+                default:
+                    Console.WriteLine("[ERROR] Command unknown");
                     break;
             }
         }
 
-        private void Reply(String message)
-        {
-            //Program.server.Reply("copy " + socket.Message, socket.Sender);
-            Program.server.Reply(message, socket.Sender);
-        }
+        
 
         private void checkAliveListener()
         {
@@ -67,16 +80,16 @@ namespace BattleRoyale_Server
             {
                 while (connected)
                 {
-                    if (timeout >= 10)
+                    if (timeout >= 20)
                     {
                         connected = false;
-                        Console.WriteLine("[TIMEOUT] " + socket.Sender.ToString());
+                        Console.WriteLine("[TIMEOUT] " + address);
                         Program.removeClient(clientId);
                         return;
                     }
-                    Reply("alive");
+                    Send(clientId+":alive");
                     timeout += 1;
-                    Thread.Sleep(1000);
+                    Thread.Sleep(3000);
                 }
             });
         }
@@ -86,9 +99,11 @@ namespace BattleRoyale_Server
             return clientId;
         }
 
-        public System.Net.IPEndPoint getSender()
+        
+
+        public void Send(string message)
         {
-            return socket.Sender;
+            Program.Reply(message, address);
         }
     }
 }
