@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
@@ -25,6 +25,7 @@ namespace BattleRoyale_Server
         public async Task<Received> Receive()
         {
             var result = await Client.ReceiveAsync();
+   
             return new Received()
             {
                 Message = Encoding.ASCII.GetString(result.Buffer, 0, result.Buffer.Length),
@@ -38,7 +39,7 @@ namespace BattleRoyale_Server
     {
         private IPEndPoint _listenOn;
 
-        public UdpListener() : this(new IPEndPoint(IPAddress.Any, 32123))
+        public UdpListener() : this(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 32123))
         {
         }
 
@@ -50,9 +51,19 @@ namespace BattleRoyale_Server
 
         public void Reply(string message, IPEndPoint endpoint)
         {
-            var datagram = Encoding.ASCII.GetBytes(message);
-            Client.Send(datagram, datagram.Length, endpoint);
+            Task.Run(() =>
+            {
+                var datagram = Encoding.ASCII.GetBytes(message);
+                Client.Send(datagram, datagram.Length, endpoint);
+            });
         }
+
+        public UdpClient getUdpClient()
+        {
+            return Client;
+        }
+
+
 
     }
 }
