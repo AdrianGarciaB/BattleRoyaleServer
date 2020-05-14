@@ -1,4 +1,6 @@
 using Assets.Scripts.Multiplayer;
+using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -6,28 +8,57 @@ public class Client : MonoBehaviour
 {
    
 
-    public GameObject player;
-    private UdpUser udpUser;
+    public GameObject playerToInstanciate;
+    public Dictionary<int, GameObject> playerEnemies;
+    private UdpUser input;
+    private UdpUser output;
+    private int userId;
+    private bool connected;
 
     // Start is called before the first frame update
     void Start()
     {
         Debug.Log("Connecting...");
-        udpUser = UdpUser.ConnectTo("127.0.0.1", 32123);
-        udpUser.Send("Conected?");
+        input = UdpUser.ConnectTo("127.0.0.1", 32123);
+
+
+        input.Send("0:init");
+
+        playerEnemies = new Dictionary<int, GameObject>();
+
+        connected = true;
+
         Task.Factory.StartNew(async () =>
         {
-            while (true)
+            Debug.Log("Waiting for userId...");
+
+            var received = await input.Receive();
+            userId = int.Parse(received.Message);
+
+            Debug.Log("UserId is: " + userId);
+
+            while (connected)
             {
-                var received = await udpUser.Receive();
-                switch (received.Message)
+                Debug.Log("Waiting...");
+                received = await input.Receive();
+                string[] response = received.Message.Split(':');
+
+                switch (response[1])
                 {
                     case "alive":
-                        udpUser.Send("alive");
+                        input.Send(userId + ":alive");
+                        break;
+                    case "newplayer":
+                        Debug.Log("New player");
+                        GameObject player = Instantiate(playerToInstanciate);
+                        playerEnemies.Add(int.Parse(response[1]), player);
+                        break;
+                    default:
+                        Debug.Log("Unknown packet: " );
                         break;
                 }
             }
-        });
+        }).Wait();
     }
 
     // Update is called once per frame
@@ -36,5 +67,10 @@ public class Client : MonoBehaviour
        //Send(player.transform.position.ToString());
     }
 
-   
+    void OnDestroy()
+    {
+        connected = false;
+    }
+
+
 }
